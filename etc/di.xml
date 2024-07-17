@@ -1,0 +1,18 @@
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Api -->
+    <preference for="Origami\Vendor\Api\OrigamiApiInterface" type="Origami\Vendor\Model\Api\OrigamiApi"/>
+
+    <!-- Catalog -->
+    <preference for="Origami\Vendor\Api\Data\OrigamiCatalogApiInterface" type="Origami\Vendor\Model\Data\OrigamiCatalogApi"/>
+
+    <preference for="Origami\Vendor\Api\Data\OrigamiPaginationInterface" type="Origami\Vendor\Model\Data\OrigamiPagination"/>
+    <preference for="Origami\Vendor\Api\Data\OrigamiProductInterface" type="Origami\Vendor\Model\Data\OrigamiProduct"/>
+    <preference for="Origami\Vendor\Api\Data\OrigamiProductImageInterface" type="Origami\Vendor\Model\Data\OrigamiProductImage"/>
+    <preference for="Origami\Vendor\Api\Data\OrigamiProductCategoryInterface" type="Origami\Vendor\Model\Data\OrigamiProductCategory"/>
+    <preference for="Origami\Vendor\Api\Data\OrigamiProductMetaInterface" type="Origami\Vendor\Model\Data\OrigamiProductMeta"/>
+
+    <!-- Categories -->
+    <preference for="Origami\Vendor\Api\Data\OrigamiCatagoriesApiInterface" type="Origami\Vendor\Model\Data\OrigamiCatagoriesApi"/>
+
+    <preference for="Origami\Vendor\Api\Data\OrigamiCategoryInterface" type="Origami\Vendor\Model\Data\OrigamiCategory"/>
+</config>
