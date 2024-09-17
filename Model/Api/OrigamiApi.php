@@ -259,15 +259,19 @@ class OrigamiApi implements OrigamiApiInterface
         ];
     }
 
+
     public function methodCatalog($id)
     {
+        $categoryToCheck = 3;
         $allProducts = [];
 
         if($id){
             $product = $this->productRepository->getById($id);
 
-            if(!$product->getData('origami_seller')){
+            if(in_array($categoryToCheck, $product->getCategoryIds())){
                 $allProducts[] = $product;
+            }else{
+                throw new \Exception("Product not found");
             }
         }else{
             $pageSize = 10;
@@ -283,7 +287,7 @@ class OrigamiApi implements OrigamiApiInterface
             if($pageSize <= 0) $pageSize = 10;
 
             $categoryIds = [];
-            $category = $this->categoryRepository->get(3);
+            $category = $this->categoryRepository->get($categoryToCheck);
             $childrenCategories = $category->getChildrenCategories();
             foreach ($childrenCategories as $childCategory) {
                 $categoryIds[] = $childCategory->getId();
