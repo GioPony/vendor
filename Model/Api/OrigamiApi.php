@@ -194,7 +194,7 @@ class OrigamiApi implements OrigamiApiInterface
 
     public function getPriceWithTax($product)
     {
-        return (float)$product->getPrice() + (float)$this->taxCalculation->calcTaxAmount($product->getPrice(), $this->getTaxRate($product), false);
+        return (float)(float)$product->getData('recommanded_price') + (float)$this->taxCalculation->calcTaxAmount((float)$product->getData('recommanded_price'), $this->getTaxRate($product), false);
     }
 
     public function getTaxRate($product)
@@ -378,7 +378,7 @@ class OrigamiApi implements OrigamiApiInterface
                     "description_short" => $product->getShortDescription(),
                     "brand_id" => null,
                     "quantity" => $this->getQuantity($product),
-                    "price_tax_exc" => (float)$product->getPrice(),
+                    "price_tax_exc" => (float)$product->getData('recommanded_price'),
                     "old_price_tax_exc" => null,
                     "price_tax_inc" => $this->getPriceWithTax($product),
                     "old_price_tax_inc" => null,
