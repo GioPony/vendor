@@ -478,6 +478,15 @@ class OrigamiApi implements OrigamiApiInterface
      */
     public function index($method, $id = null): mixed
     {
+        $key = $this->request->getParam('key');
+        $configKey = $this->scopeConfig->getValue('origami_vendor/config/magento_api_token', ScopeInterface::SCOPE_WEBSITES, 1);
+
+        if(!$key || !$configKey)
+            throw new \Exception("Key is required.");
+
+        if($key !== $configKey)
+            throw new \Exception("Key is different.");
+
         switch ($method) {
             case "catalog":
                 return $this->methodCatalog($id);

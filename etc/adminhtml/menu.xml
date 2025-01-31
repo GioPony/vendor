@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
-    <menu>
-        <add id="Origami_Vendor::parent_vendor" title="Vendor" module="Origami_Vendor" sortOrder="10" resource="Origami_Vendor::parent_config" parent="Origami_Core::origami"/>
-        <add id="Origami_Vendor::sync" title="Synchronisation" module="Origami_Vendor" sortOrder="10" action="origami_vendor/sync" resource="Origami_Vendor::sync" parent="Origami_Vendor::parent_vendor"/>
-    </menu>
-</config>
