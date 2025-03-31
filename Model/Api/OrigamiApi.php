@@ -144,7 +144,7 @@ class OrigamiApi implements OrigamiApiInterface
         $sellerId = $this->scopeConfig->getValue('origami_vendor/config/seller_id', ScopeInterface::SCOPE_WEBSITES, 1);
         if (!empty($sellerId)) {
             try {
-                $origamiProductOfferFactory = ObjectManager::getInstance(\Origami\Core\Model\OrigamiProductOfferFactory::class);
+                $origamiProductOfferFactory = ObjectManager::getInstance()->get(\Origami\Core\Model\OrigamiProductOfferFactory::class);
                 $origamiProductOfferCollection = $origamiProductOfferFactory->create()->getCollection();
                 $origamiProductOfferCollection
                     ->addFieldToFilter('id_main_product', $product->getId())
