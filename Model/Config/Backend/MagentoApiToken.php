@@ -67,6 +67,9 @@ class MagentoApiToken extends \Magento\Framework\App\Config\Value
             $website = $this->storeManager->getDefaultStoreView()->getWebsite()->getId();
         }
 
+        var_dump($website);
+        die();
+
         if (!$result->getValue() || empty($result->getValue()))
             $this->configWriter->save("origami_vendor/config/magento_api_token", $this->random->getRandomString(16), ScopeInterface::SCOPE_WEBSITES, $website);
 
