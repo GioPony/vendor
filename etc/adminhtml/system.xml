@@ -7,7 +7,7 @@
 -->
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
     <system>
-        <!-- Origami Core -->
+        <!-- Origami Vendor -->
         <tab id="origami_tab" translate="label" sortOrder="50">
             <label>Origami</label>
         </tab>
@@ -35,7 +35,7 @@
                 <field id="magento_api_token" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Magento API Token</label>
                     <comment>Keep empty to generate</comment>
-                    <backend_model>Origami\Core\Model\Config\Backend\MagentoApiToken</backend_model>
+                    <backend_model>Origami\Vendor\Model\Config\Backend\MagentoApiToken</backend_model>
                 </field>
             </group>
         </section>

@@ -14,11 +14,7 @@ use Origami\Vendor\Model\Data\OrigamiProductCategoryFactory;
 use Origami\Vendor\Model\Data\OrigamiProductFeatureFactory;
 use Origami\Vendor\Model\Data\OrigamiProductMetaFactory;
 
-use Origami\Vendor\Model\Data\OrigamiCategoryFactory;
-
-use \Origami\Core\Model\OrigamiCategory;
-use \Origami\Core\Model\OrigamiProductOfferFactory;
-
+use Magento\Framework\App\ObjectManager;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\RequestInterface;
@@ -54,11 +50,6 @@ class OrigamiApi implements OrigamiApiInterface
     public OrigamiProductFeatureFactory $origamiProductFeatureFactory;
     public OrigamiProductMetaFactory $origamiProductMetaFactory;
 
-    public OrigamiCategoryFactory $origamiCategoryFactory;
-
-    public OrigamiCategory $origamiCategory;
-    public OrigamiProductOfferFactory $origamiProductOfferFactory;
-
     public StoreManagerInterface $storeManager;
     public ProductFactory $product;
     public ProductRepositoryInterface $productRepository;
@@ -88,11 +79,6 @@ class OrigamiApi implements OrigamiApiInterface
         OrigamiProductFeatureFactory $origamiProductFeatureFactory,
         OrigamiProductMetaFactory $origamiProductMetaFactory,
 
-        OrigamiCategoryFactory $origamiCategoryFactory,
-
-        OrigamiCategory $origamiCategory,
-        OrigamiProductOfferFactory $origamiProductOfferFactory,
-
         StoreManagerInterface $storeManager,
         ProductFactory $product,
         ProductRepositoryInterface $productRepository,
@@ -121,11 +107,6 @@ class OrigamiApi implements OrigamiApiInterface
         $this->origamiProductCategoryFactory = $origamiProductCategoryFactory;
         $this->origamiProductFeatureFactory = $origamiProductFeatureFactory;
         $this->origamiProductMetaFactory = $origamiProductMetaFactory;
-
-        $this->origamiCategoryFactory = $origamiCategoryFactory;
-
-        $this->origamiCategory = $origamiCategory;
-        $this->origamiProductOfferFactory = $origamiProductOfferFactory;
 
         $this->storeManager = $storeManager;
         $this->product = $product;
@@ -161,31 +142,36 @@ class OrigamiApi implements OrigamiApiInterface
     public function getQuantity($product)
     {
         $sellerId = $this->scopeConfig->getValue('origami_vendor/config/seller_id', ScopeInterface::SCOPE_WEBSITES, 1);
-        if(!empty($sellerId)){
-            $origamiProductOfferCollection = $this->origamiProductOfferFactory->create()->getCollection();
-            $origamiProductOfferCollection
-                ->addFieldToFilter('id_main_product', $product->getId())
-                ->addFieldToFilter('origami_seller_id', $sellerId);
+        if (!empty($sellerId)) {
+            try {
+                $origamiProductOfferFactory = ObjectManager::getInstance(\Origami\Core\Model\OrigamiProductOfferFactory::class);
+                $origamiProductOfferCollection = $origamiProductOfferFactory->create()->getCollection();
+                $origamiProductOfferCollection
+                    ->addFieldToFilter('id_main_product', $product->getId())
+                    ->addFieldToFilter('origami_seller_id', $sellerId);
 
-            $origamiProductOffer = $origamiProductOfferCollection->getFirstItem();
+                $origamiProductOffer = $origamiProductOfferCollection->getFirstItem();
 
-            if(!$origamiProductOffer->getId())
+                if (!$origamiProductOffer->getId())
+                    return 0;
+
+                $product = $this->product->create();
+                $product->load($origamiProductOffer->getIdProduct());
+
+                $searchCriteria = $this->searchCriteriaBuilder
+                    ->addFilter('sku', $product->getSku(), 'eq')
+                    ->create();
+
+                $sourceItems = $this->sourceItemRepository->getList($searchCriteria)->getItems();
+
+                foreach ($sourceItems as $sourceItem) {
+                    return $sourceItem->getQuantity();
+                }
+
                 return 0;
-
-            $product = $this->product->create();
-            $product->load($origamiProductOffer->getIdProduct());
-
-            $searchCriteria = $this->searchCriteriaBuilder
-                ->addFilter('sku', $product->getSku(), 'eq')
-                ->create();
-
-            $sourceItems = $this->sourceItemRepository->getList($searchCriteria)->getItems();
-
-            foreach($sourceItems as $sourceItem){
-                return $sourceItem->getQuantity();
+            } catch (\Exception $error) {
+                return 0;
             }
-
-            return 0;
         }
 
         $stockItem = $this->stockRegistry->getStockItem($product->getId(), $product->getStore()->getWebsiteId());
@@ -206,9 +192,7 @@ class OrigamiApi implements OrigamiApiInterface
         return $this->taxCalculation->getRate($rateRequest->setProductClassId($taxClassId));
     }
 
-    public function getDefaultCategory($product)
-    {
-    }
+    public function getDefaultCategory($product) {}
 
     public function getCategories($product)
     {
@@ -308,7 +292,7 @@ class OrigamiApi implements OrigamiApiInterface
         $allProducts = [];
 
         $categoryIds = [];
-        if($categoryToCheck){
+        if ($categoryToCheck) {
             $category = $this->categoryRepository->get($categoryToCheck);
             $childrenCategories = $category->getChildrenCategories();
             foreach ($childrenCategories as $childCategory) {
@@ -316,28 +300,28 @@ class OrigamiApi implements OrigamiApiInterface
             }
         }
 
-        if($id){
+        if ($id) {
             $product = $this->productRepository->getById($id);
 
-            if(count($categoryIds)){
-                if(array_intersect($categoryIds, $product->getCategoryIds())){
+            if (count($categoryIds)) {
+                if (array_intersect($categoryIds, $product->getCategoryIds())) {
                     $allProducts[] = $product;
-                }else{
+                } else {
                     throw new \Exception("Product not found");
                 }
             }
-        }else{
+        } else {
             $pageSize = 10;
             $curPage = 1;
 
             $page = $this->request->getParam('page');
-            if(isset($page)){
+            if (isset($page)) {
                 $pageSize = (int)$page['size'] ?? 10;
                 $curPage = (int)$page['number'] ?? 1;
             }
 
-            if($curPage <= 0) $curPage = 1;
-            if($pageSize <= 0) $pageSize = 10;
+            if ($curPage <= 0) $curPage = 1;
+            if ($pageSize <= 0) $pageSize = 10;
 
             $allProducts = $this->productCollection->create()
                 ->addAttributeToSelect('*')
@@ -347,11 +331,11 @@ class OrigamiApi implements OrigamiApiInterface
                 ->setCurPage($curPage);
         }
 
-        if($id){
+        if ($id) {
             $body = [
                 "products" => [],
             ];
-        }else{
+        } else {
             $body = [
                 "products" => [],
                 "pagination" => [
@@ -360,12 +344,12 @@ class OrigamiApi implements OrigamiApiInterface
                     "page_number" => $curPage,
                     "page_size" => $pageSize,
                     "offset" => ($curPage - 1) * $pageSize,
-                    "limit" => $pageSize   
+                    "limit" => $pageSize
                 ],
             ];
         }
 
-        if(count($allProducts)){
+        if (count($allProducts)) {
             foreach ($allProducts as $product) {
                 $images = $this->getImages($product->getId());
 
@@ -407,11 +391,11 @@ class OrigamiApi implements OrigamiApiInterface
             }
         }
 
-        if($id){
+        if ($id) {
             $this->response->setHeader('Content-Type', 'application/json', true)
                 ->setBody(json_encode(count($body['products']) ? $body['products'][0] : null))
                 ->sendResponse();
-        }else{
+        } else {
             $this->response->setHeader('Content-Type', 'application/json', true)
                 ->setBody(json_encode($body))
                 ->sendResponse();
@@ -423,7 +407,7 @@ class OrigamiApi implements OrigamiApiInterface
         $body = [];
 
         $allCategories = $this->categoryCollection->create()->addAttributeToSelect('*');
-        
+
         foreach ($allCategories as $category) {
             $body[] = [
                 "id_category" => (int)$category->getId(),
@@ -434,13 +418,14 @@ class OrigamiApi implements OrigamiApiInterface
                 "link_rewrite" => $category->getUrlKey(),
             ];
         }
-        
+
         $this->response->setHeader('Content-Type', 'application/json', true)
             ->setBody(json_encode($body))
             ->sendResponse();
     }
 
-    public function methodFeatures($id){
+    public function methodFeatures($id)
+    {
         $features = [];
 
         $searchCriteria = $this->searchCriteriaBuilder
@@ -467,7 +452,8 @@ class OrigamiApi implements OrigamiApiInterface
             ->sendResponse();
     }
 
-    public function methodAttributes(){
+    public function methodAttributes()
+    {
         $this->response->setHeader('Content-Type', 'application/json', true)
             ->setBody(json_encode([]))
             ->sendResponse();
@@ -481,10 +467,10 @@ class OrigamiApi implements OrigamiApiInterface
         $key = $this->request->getParam('key');
         $configKey = $this->scopeConfig->getValue('origami_vendor/config/magento_api_token', ScopeInterface::SCOPE_WEBSITES, 1);
 
-        if(!$key || !$configKey)
+        if (!$key || !$configKey)
             throw new \Exception("Key is required.");
 
-        if($key !== $configKey)
+        if ($key !== $configKey)
             throw new \Exception("Key is different.");
 
         switch ($method) {

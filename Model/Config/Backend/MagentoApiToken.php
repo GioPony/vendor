@@ -4,7 +4,7 @@
  * See COPYING.txt for license details.
  */
 
-namespace Origami\Core\Model\Config\Backend;
+namespace Origami\Vendor\Model\Config\Backend;
 
 use Magento\Framework\App\ObjectManager;
 use Magento\Framework\App\RequestInterface;
