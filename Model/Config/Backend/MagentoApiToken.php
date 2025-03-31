@@ -61,10 +61,10 @@ class MagentoApiToken extends \Magento\Framework\App\Config\Value
     public function afterSave()
     {
         $result = parent::afterSave();
-        $website = $this->request->getParam('website');
+        $website = $this->request->getParam('website') ?: 1;
 
         if (!$result->getValue() || empty($result->getValue()))
-            $this->configWriter->save("origami_vendor/config/magento_api_token", $this->random->getRandomString(16), ScopeInterface::SCOPE_WEBSITES, $website ?? 1);
+            $this->configWriter->save("origami_vendor/config/magento_api_token", $this->random->getRandomString(16), ScopeInterface::SCOPE_WEBSITES, $website);
 
         return $result;
     }
