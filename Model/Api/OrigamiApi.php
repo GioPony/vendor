@@ -130,9 +130,9 @@ class OrigamiApi implements OrigamiApiInterface
 
     public function getTaxes($product)
     {
+        /*
         $taxClassId = $product->getTaxClassId();
         $taxRate = $this->taxRateRepository->get($taxClassId);
-        /*
         [
             "magento" => $taxRate->getData(),
             "id_tax" => (int)$taxClassId,
@@ -329,10 +329,18 @@ class OrigamiApi implements OrigamiApiInterface
 
             $allProducts = $this->productCollection->create()
                 ->addAttributeToSelect('*')
-                ->addCategoriesFilter(['in' => $categoryIds])
-                ->addAttributeToFilter('origami_seller', ['null' => true], 'left')
                 ->setPageSize($pageSize)
                 ->setCurPage($curPage);
+
+            $eavConfig = ObjectManager::getInstance()->get(\Magento\Eav\Model\Config::class);
+            $attribute = $eavConfig->getAttribute(\Magento\Catalog\Model\Product::ENTITY, 'origami_seller');
+            if ($attribute && $attribute->getId()) {
+                $allProducts->addAttributeToFilter('origami_seller', ['null' => true], 'left');
+            }
+
+            if (count($categoryIds) > 0) {
+                $allProducts->addCategoriesFilter(['in' => $categoryIds]);
+            }
         }
 
         if ($id) {
