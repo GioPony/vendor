@@ -21,14 +21,20 @@ class ApiUrl extends Field
      */
     protected function _renderValue(AbstractElement $element)
     {
-        $storeManager = ObjectManager::getInstance()->get(StoreManagerInterface::class);
-        $scopeConfig = ObjectManager::getInstance()->get(ScopeConfigInterface::class);
-        $request= ObjectManager::getInstance()->get(RequestInterface::class);
+        $objectManager = ObjectManager::getInstance();
+        $storeManager = $objectManager->get(StoreManagerInterface::class);
+        $scopeConfig = $objectManager->get(ScopeConfigInterface::class);
+        $request = ObjectManager::getInstance()->get(RequestInterface::class);
+        $websiteId = $request->getParam('website');
+        $website = $storeManager->getWebsite($websiteId);
+        $store = $website->getDefaultStore();
 
-        $website = $request->getParam('website');
-        $key = $scopeConfig->getValue('origami_vendor/config/magento_api_token', ScopeInterface::SCOPE_WEBSITES, $website);
+        if (!$store) {
+            return '<td class="value"><span id="' . $element->getHtmlId() . '">No store found for this website</span></td>';
+        }
 
-        $apiUrl = $storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_WEB) . "rest/all/V1/origami/vendor/api?key=$key";
+        $key = $scopeConfig->getValue('origami_vendor/config/magento_api_token', ScopeInterface::SCOPE_WEBSITES, $websiteId);
+        $apiUrl = $store->getBaseUrl(UrlInterface::URL_TYPE_WEB) . "rest/all/V1/origami/vendor/api?key=$key";
 
         $html = '<td class="value">';
         $html .= '<span id="' . $element->getHtmlId() . '">' . $apiUrl . '</span>';

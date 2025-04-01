@@ -7,7 +7,7 @@
 -->
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
     <system>
-        <!-- Origami Vendor -->
+        <!-- Origami Core -->
         <tab id="origami_tab" translate="label" sortOrder="50">
             <label>Origami</label>
         </tab>
@@ -18,21 +18,21 @@
             <resource>Origami_Vendor::all</resource>
             <group id="config" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                 <label>Config</label>
-                <field id="intro" translate="label" type="label" sortOrder="0" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label></label>
+                <group id="intro" translate="label" type="text" sortOrder="0" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <hide_in_single_store_mode>1</hide_in_single_store_mode>
                     <frontend_model>Origami\Vendor\Block\Adminhtml\System\Config\Intro</frontend_model>
-                </field>
-                <field id="api_url" translate="label" type="label" sortOrder="0" showInDefault="1" showInWebsite="1" showInStore="0">
+                </group>
+                <field id="api_url" translate="label" type="label" sortOrder="0" showInDefault="0" showInWebsite="1" showInStore="0">
                     <label>Api url</label>
                     <frontend_model>Origami\Vendor\Block\Adminhtml\System\Config\ApiUrl</frontend_model>
                 </field>
                 <field id="category_id" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Limit to a category</label>
                 </field>
-                <field id="seller_id" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                <field id="seller_id" type="text" sortOrder="10" showInDefault="0" showInWebsite="1" showInStore="0">
                     <label>ID Seller for quantity</label>
                 </field>
-                <field id="magento_api_token" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                <field id="magento_api_token" type="text" sortOrder="10" showInDefault="0" showInWebsite="1" showInStore="0">
                     <label>Magento API Token</label>
                     <comment>Keep empty to generate</comment>
                     <backend_model>Origami\Vendor\Model\Config\Backend\MagentoApiToken</backend_model>

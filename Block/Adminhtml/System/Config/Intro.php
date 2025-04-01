@@ -17,13 +17,8 @@ class Intro extends Field
     {
         $html = '
         <style>
-            .use-default,
             .origami_vendor_config_intro{
                 display: none;
-            }
-
-            span::before{
-                content: "" !important;
             }
         </style>';
 
@@ -46,6 +41,10 @@ class Intro extends Field
                     <li style="margin-bottom: 10px; font-size: 16px;">
                         <strong>Set the Stock ID (Optional)</strong><br>
                         Define the stock ID you want to sync from Magento.
+                    </li>
+                    <li style="margin-bottom: 10px; font-size: 16px;">
+                        <strong>Select your website config</strong><br>
+                        Select which website you want to configure.
                     </li>
                     <li style="margin-bottom: 10px; font-size: 16px;">
                         <strong>Generate or Enter a Token</strong><br>
