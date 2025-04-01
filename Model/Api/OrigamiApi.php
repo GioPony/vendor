@@ -32,6 +32,7 @@ use Magento\Tax\Model\Calculation as TaxCaclulation;
 use Magento\Tax\Api\TaxRateRepositoryInterface;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\Framework\Webapi\Rest\Response;
+use Magento\Store\Model\WebsiteRepository;
 
 use Origami\Vendor\Api\OrigamiApiInterface;
 
@@ -51,6 +52,7 @@ class OrigamiApi implements OrigamiApiInterface
     public OrigamiProductMetaFactory $origamiProductMetaFactory;
 
     public StoreManagerInterface $storeManager;
+    public WebsiteRepository $websiteRepository;
     public ProductFactory $product;
     public ProductRepositoryInterface $productRepository;
     public ProductCollectionFactory $productCollection;
@@ -80,6 +82,7 @@ class OrigamiApi implements OrigamiApiInterface
         OrigamiProductMetaFactory $origamiProductMetaFactory,
 
         StoreManagerInterface $storeManager,
+        WebsiteRepository $websiteRepository,
         ProductFactory $product,
         ProductRepositoryInterface $productRepository,
         ProductCollectionFactory $productCollection,
@@ -109,6 +112,7 @@ class OrigamiApi implements OrigamiApiInterface
         $this->origamiProductMetaFactory = $origamiProductMetaFactory;
 
         $this->storeManager = $storeManager;
+        $this->websiteRepository = $websiteRepository;
         $this->product = $product;
         $this->productRepository = $productRepository;
         $this->productCollection = $productCollection;
@@ -465,13 +469,25 @@ class OrigamiApi implements OrigamiApiInterface
     public function index($method, $id = null): mixed
     {
         $key = $this->request->getParam('key');
-        $configKey = $this->scopeConfig->getValue('origami_vendor/config/magento_api_token', ScopeInterface::SCOPE_WEBSITES, 1);
+        $websites = $this->storeManager->getWebsites();
+        $websiteId = null;
 
-        if (!$key || !$configKey)
-            throw new \Exception("Key is required.");
+        foreach ($websites as $website) {
+            $configKey = $this->scopeConfig->getValue(
+                'origami_vendor/config/magento_api_token',
+                ScopeInterface::SCOPE_WEBSITES,
+                $website->getId()
+            );
 
-        if ($key !== $configKey)
+            if ($configKey === $key) {
+                $websiteId = $website->getId();
+                break;
+            }
+        }
+
+        if (!isset($websiteId)) {
             throw new \Exception("Key is different.");
+        }
 
         switch ($method) {
             case "catalog":
