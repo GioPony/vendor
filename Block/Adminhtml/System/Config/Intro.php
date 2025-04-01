@@ -35,16 +35,16 @@ class Intro extends Field
             <div style="background-color: #ffffff; border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-top: 20px;">
                 <ol style="padding-left: 20px;">
                     <li style="margin-bottom: 10px; font-size: 16px;">
+                        <strong>Select your website</strong><br>
+                        First of all, please select in your header the desired website from which to generate the feed.
+                    </li>
+                    <li style="margin-bottom: 10px; font-size: 16px;">
                         <strong>Set the Category ID (Optional)</strong><br>
                         Specify the ID of a Magento category to fetch its related subcategories.
                     </li>
                     <li style="margin-bottom: 10px; font-size: 16px;">
                         <strong>Set the Stock ID (Optional)</strong><br>
                         Define the stock ID you want to sync from Magento.
-                    </li>
-                    <li style="margin-bottom: 10px; font-size: 16px;">
-                        <strong>Select your website config</strong><br>
-                        Select which website you want to configure.
                     </li>
                     <li style="margin-bottom: 10px; font-size: 16px;">
                         <strong>Generate or Enter a Token</strong><br>
