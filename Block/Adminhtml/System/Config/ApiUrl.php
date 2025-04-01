@@ -34,6 +34,11 @@ class ApiUrl extends Field
         }
 
         $key = $scopeConfig->getValue('origami_vendor/config/magento_api_token', ScopeInterface::SCOPE_WEBSITES, $websiteId);
+
+        if(!$key){
+            return '<td class="value"><span id="' . $element->getHtmlId() . '">You need to save to generate the key</span></td>';
+        }
+
         $apiUrl = $store->getBaseUrl(UrlInterface::URL_TYPE_WEB) . "rest/all/V1/origami/vendor/api?key=$key";
 
         $html = '<td class="value">';
