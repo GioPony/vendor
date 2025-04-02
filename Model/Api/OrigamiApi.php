@@ -225,7 +225,7 @@ class OrigamiApi implements OrigamiApiInterface
         return $images[$imageIndex];
     }
 
-    public function getImages($productId)
+    public function getImages($productId, $website)
     {
         $images = [];
 
@@ -238,7 +238,7 @@ class OrigamiApi implements OrigamiApiInterface
                 "id_image" => (int)$image->getId(),
                 "legend" => $image->getContent(),
                 "position" => $image->getPosition(),
-                "url" => $this->storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_MEDIA) . 'catalog/product' . $image->getFile(),
+                "url" => $website->getDefaultStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_MEDIA) . 'catalog/product' . $image->getFile(),
             ];
         }
 
@@ -290,9 +290,9 @@ class OrigamiApi implements OrigamiApiInterface
     }
 
 
-    public function methodCatalog($id)
+    public function methodCatalog($id, $website)
     {
-        $categoryToCheck = $this->scopeConfig->getValue('origami_vendor/config/category_id', ScopeInterface::SCOPE_WEBSITES, 1);
+        $categoryToCheck = $this->scopeConfig->getValue('origami_vendor/config/category_id', ScopeInterface::SCOPE_WEBSITES, $website->getId());
         $allProducts = [];
 
         $categoryIds = [];
@@ -330,6 +330,7 @@ class OrigamiApi implements OrigamiApiInterface
             $allProducts = $this->productCollection->create()
                 ->addAttributeToSelect('*')
                 ->setPageSize($pageSize)
+                ->addWebsiteFilter($website->getId())
                 ->setCurPage($curPage);
 
             $eavConfig = ObjectManager::getInstance()->get(\Magento\Eav\Model\Config::class);
@@ -363,13 +364,13 @@ class OrigamiApi implements OrigamiApiInterface
 
         if (count($allProducts)) {
             foreach ($allProducts as $product) {
-                $images = $this->getImages($product->getId());
+                $images = $this->getImages($product->getId(), $website);
 
                 $body['products'][] = [
                     "id" => $product->getId(),
                     "reference" => $product->getSku(),
                     "name" => $product->getName(),
-                    "link" => $this->storeManager->getStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB) . "/" . $product->getUrlKey() . ".html",
+                    "link" => $website->getDefaultStore()->getBaseUrl(\Magento\Framework\UrlInterface::URL_TYPE_WEB) . "/" . $product->getUrlKey() . ".html",
                     "description" => $product->getDescription(),
                     "description_short" => $product->getShortDescription(),
                     "brand_id" => null,
@@ -478,28 +479,28 @@ class OrigamiApi implements OrigamiApiInterface
     {
         $key = $this->request->getParam('key');
         $websites = $this->storeManager->getWebsites();
-        $websiteId = null;
+        $website = null;
 
-        foreach ($websites as $website) {
+        foreach ($websites as $innerWebsite) {
             $configKey = $this->scopeConfig->getValue(
                 'origami_vendor/config/magento_api_token',
                 ScopeInterface::SCOPE_WEBSITES,
-                $website->getId()
+                $innerWebsite->getId()
             );
 
             if ($configKey === $key) {
-                $websiteId = $website->getId();
+                $website = $innerWebsite;
                 break;
             }
         }
 
-        if (!isset($websiteId)) {
+        if (!isset($website) || null === $website->getId()) {
             throw new \Exception("Key is different.");
         }
 
         switch ($method) {
             case "catalog":
-                return $this->methodCatalog($id);
+                return $this->methodCatalog($id, $website);
 
             case "categories":
                 return $this->methodCategories($id);
