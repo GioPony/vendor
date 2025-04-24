@@ -148,31 +148,12 @@ class OrigamiApi implements OrigamiApiInterface
         $sellerId = $this->scopeConfig->getValue('origami_vendor/config/seller_id', ScopeInterface::SCOPE_WEBSITES, 1);
         if (!empty($sellerId)) {
             try {
-                $origamiProductOfferFactory = ObjectManager::getInstance()->get(\Origami\Core\Model\OrigamiProductOfferFactory::class);
-                $origamiProductOfferCollection = $origamiProductOfferFactory->create()->getCollection();
-                $origamiProductOfferCollection
-                    ->addFieldToFilter('id_main_product', $product->getId())
-                    ->addFieldToFilter('origami_seller_id', $sellerId);
-
-                $origamiProductOffer = $origamiProductOfferCollection->getFirstItem();
-
-                if (!$origamiProductOffer->getId())
+                $child = $this->sourceItemRepository->get($product->getId(), $sellerId);
+                if ($child->getQuantity() > 0) {
+                    return $child->getQuantity();
+                } else {
                     return 0;
-
-                $product = $this->product->create();
-                $product->load($origamiProductOffer->getIdProduct());
-
-                $searchCriteria = $this->searchCriteriaBuilder
-                    ->addFilter('sku', $product->getSku(), 'eq')
-                    ->create();
-
-                $sourceItems = $this->sourceItemRepository->getList($searchCriteria)->getItems();
-
-                foreach ($sourceItems as $sourceItem) {
-                    return $sourceItem->getQuantity();
                 }
-
-                return 0;
             } catch (\Exception $error) {
                 return 0;
             }
