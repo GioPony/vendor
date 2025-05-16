@@ -148,12 +148,21 @@ class OrigamiApi implements OrigamiApiInterface
         $sellerId = $this->scopeConfig->getValue('origami_vendor/config/seller_id', ScopeInterface::SCOPE_WEBSITES, 1);
         if (!empty($sellerId)) {
             try {
-                $child = $this->sourceItemRepository->get($product->getId(), $sellerId);
-                if ($child->getQuantity() > 0) {
-                    return $child->getQuantity();
-                } else {
+                $searchCriteria = $this->searchCriteriaBuilder
+                    ->addFilter('sku', $product->getSku())
+                    ->addFilter('source_code', $sellerId)
+                    ->create();
+
+                    $items = $this->sourceItemRepository->getList($searchCriteria)->getItems();
+
+                    if (!empty($items)) {
+                        $sourceItem = reset($items);
+                        if ($sourceItem->getQuantity() > 0) {
+                            return $sourceItem->getQuantity();
+                        }
+                    }
+
                     return 0;
-                }
             } catch (\Exception $error) {
                 return 0;
             }
