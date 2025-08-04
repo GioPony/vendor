@@ -273,7 +273,7 @@ class OrigamiApi implements OrigamiApiInterface
                 "pdf_delivery" => null,
                 "deleted" => null,
                 "id_order_history" => $history->getId(),
-                "id_employee" => $history->getIsCustomerNotified() ? "0" : "1",
+                "id_employee" => null,
                 "id_order" => $order->getId(),
                 "date_add" => $history->getCreatedAt(),
                 "employee_firstname" => null,
