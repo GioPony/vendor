@@ -256,7 +256,7 @@ class OrigamiApi implements OrigamiApiInterface
         }
 
         $states_history = [];
-        foreach ($order->getStatusHistory() ?: [] as $history) {
+        foreach ($order->getStatusHistoryCollection() ?: [] as $history) {
             $states_history[] = [
                 "id_order_state" => $history->getStatus(),
                 "invoice" => null,
