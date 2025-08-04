@@ -2,18 +2,15 @@
 
 namespace Origami\Vendor\Model\Api;
 
-use \Magento\Catalog\Model\ProductFactory;
-
+use Magento\Catalog\Model\ProductFactory;
 use Origami\Vendor\Model\Data\OrigamiCatalogApiFactory;
 use Origami\Vendor\Model\Data\OrigamiCategoriesApiFactory;
 use Origami\Vendor\Model\Data\OrigamiPaginationFactory;
-
 use Origami\Vendor\Model\Data\OrigamiProductFactory;
 use Origami\Vendor\Model\Data\OrigamiProductImageFactory;
 use Origami\Vendor\Model\Data\OrigamiProductCategoryFactory;
 use Origami\Vendor\Model\Data\OrigamiProductFeatureFactory;
 use Origami\Vendor\Model\Data\OrigamiProductMetaFactory;
-
 use Magento\Framework\App\ObjectManager;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -33,8 +30,10 @@ use Magento\Tax\Api\TaxRateRepositoryInterface;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
 use Magento\Framework\Webapi\Rest\Response;
 use Magento\Store\Model\WebsiteRepository;
-
 use Origami\Vendor\Api\OrigamiApiInterface;
+use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
+use Magento\Sales\Model\ResourceModel\Order\Status\CollectionFactory as OrderStatusCollectionFactory;
 
 class OrigamiApi implements OrigamiApiInterface
 {
@@ -67,20 +66,21 @@ class OrigamiApi implements OrigamiApiInterface
     public TaxCaclulation $taxCalculation;
     public ScopeConfigInterface $scopeConfig;
 
+    public OrderStatusCollectionFactory $orderStatusCollectionFactory;
+    public OrderCollectionFactory $orderCollectionFactory;
+    public OrderRepositoryInterface $orderRepository;
+
     public function __construct(
         Response $response,
         RequestInterface $request,
-
         OrigamiCatalogApiFactory $origamiCatalogApiFactory,
         OrigamiCategoriesApiFactory $origamiCategoriesApiFactory,
         OrigamiPaginationFactory $origamiPaginationFactory,
-
         OrigamiProductFactory $origamiProductFactory,
         OrigamiProductImageFactory $origamiProductImageFactory,
         OrigamiProductCategoryFactory $origamiProductCategoryFactory,
         OrigamiProductFeatureFactory $origamiProductFeatureFactory,
         OrigamiProductMetaFactory $origamiProductMetaFactory,
-
         StoreManagerInterface $storeManager,
         WebsiteRepository $websiteRepository,
         ProductFactory $product,
@@ -95,8 +95,10 @@ class OrigamiApi implements OrigamiApiInterface
         TaxRateRepositoryInterface $taxRateRepository,
         StockRegistryInterface $stockRegistry,
         TaxCaclulation $taxCalculation,
-
         ScopeConfigInterface $scopeConfig,
+        OrderStatusCollectionFactory $orderStatusCollectionFactory,
+        OrderCollectionFactory $orderCollectionFactory,
+        OrderRepositoryInterface $orderRepository
     ) {
         $this->response = $response;
         $this->request = $request;
@@ -126,6 +128,330 @@ class OrigamiApi implements OrigamiApiInterface
         $this->stockRegistry = $stockRegistry;
         $this->taxCalculation = $taxCalculation;
         $this->scopeConfig = $scopeConfig;
+
+        $this->orderStatusCollectionFactory = $orderStatusCollectionFactory;
+        $this->orderCollectionFactory = $orderCollectionFactory;
+        $this->orderRepository = $orderRepository;
+    }
+
+    public function getOrderData($order)
+    {
+        $products = [];
+        foreach ($order->getAllVisibleItems() as $item) {
+            $product = null;
+            $images = null;
+
+            try {
+                $product = $this->productRepository->getById($item->getProductId());
+                $images = $this->getImages($product->getId(), $this->storeManager->getWebsite());
+            } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
+
+            }
+
+            $products[$item->getId()] = [
+                "id_order_detail" => $item->getId(),
+                "id_order" => $order->getId(),
+                "id_order_invoice" => $order->hasInvoices() ? $order->getInvoiceCollection()->getFirstItem()->getId() : null,
+                "id_warehouse" => null,
+                "id_shop" => $order->getStoreId(),
+                "product_id" => $item->getProductId(),
+                "product_attribute_id" => $item->getSku(),
+                "product_name" => $item->getName(),
+                "product_quantity" => $item->getQtyOrdered(),
+                "product_quantity_in_stock" => $product ? $this->getQuantity($product) : null,
+                "product_quantity_refunded" => $item->getQtyRefunded(),
+                "product_quantity_return" => $item->getQtyReturned(),
+                "product_quantity_reinjected" => null,
+                "product_price" => $item->getPrice(),
+                "reduction_percent" => $item->getDiscountPercent(),
+                "reduction_amount" => $item->getDiscountAmount(),
+                "reduction_amount_tax_incl" => $item->getDiscountAmount(),
+                "reduction_amount_tax_excl" => $item->getDiscountAmount(),
+                "group_reduction" => null,
+                "product_quantity_discount" => null,
+                "product_ean13" => $product ? $product->getData('ean') : null,
+                "product_upc" => $product ? $product->getData('upc') : null,
+                "product_reference" => $item->getSku(),
+                "product_supplier_reference" => null,
+                "product_weight" => $item->getWeight(),
+                "id_tax_rules_group" => $product ? $product->getTaxClassId() : null,
+                "tax_computation_method" => null,
+                "tax_name" => null,
+                "tax_rate" => $item->getTaxPercent(),
+                "ecotax" => null,
+                "ecotax_tax_rate" => null,
+                "discount_quantity_applied" => null,
+                "download_hash" => null,
+                "download_nb" => null,
+                "download_deadline" => null,
+                "total_price_tax_incl" => $item->getRowTotalInclTax(),
+                "total_price_tax_excl" => $item->getRowTotal(),
+                "unit_price_tax_incl" => $item->getPriceInclTax(),
+                "unit_price_tax_excl" => $item->getPrice(),
+                "total_shipping_price_tax_incl" => null,
+                "total_shipping_price_tax_excl" => null,
+                "purchase_supplier_price" => null,
+                "original_product_price" => $item->getOriginalPrice(),
+                "original_wholesale_price" => null,
+                "id_product" => $item->getProductId(),
+                "id_supplier" => null,
+                "id_manufacturer" => null,
+                "id_category_default" => $product ? $product->getCategoryIds() : null,
+                "id_shop_default" => null,
+                "on_sale" => null,
+                "online_only" => null,
+                "ean13" => $product ? $product->getData('ean') : null,
+                "upc" => $product ? $product->getData('upc') : null,
+                "quantity" => $product ? $this->getQuantity($product) : null,
+                "minimal_quantity" => null,
+                "price" => $product ? $product->getPrice() : null,
+                "wholesale_price" => null,
+                "unity" => null,
+                "unit_price_ratio" => null,
+                "additional_shipping_cost" => null,
+                "reference" => $product ? $product->getSku() : null,
+                "supplier_reference" => null,
+                "location" => null,
+                "width" => null,
+                "height" => null,
+                "depth" => null,
+                "weight" => $product ? $product->getWeight() : null,
+                "out_of_stock" => null,
+                "quantity_discount" => null,
+                "customizable" => null,
+                "uploadable_files" => null,
+                "text_fields" => null,
+                "active" => $product ? $product->isAvailable() : null,
+                "redirect_type" => null,
+                "id_product_redirected" => null,
+                "available_for_order" => $product ? $product->isAvailable() : null,
+                "available_date" => null,
+                "condition" => $product ? $product->getData('condition') : null,
+                "show_price" => null,
+                "indexed" => null,
+                "visibility" => null,
+                "cache_is_pack" => null,
+                "cache_has_attachments" => null,
+                "is_virtual" => $item->getIsVirtual(),
+                "cache_default_attribute" => null,
+                "date_add" => $product ? $product->getCreatedAt() : null,
+                "date_upd" => $product ? $product->getUpdatedAt() : null,
+                "advanced_stock_management" => null,
+                "pack_stock_type" => null,
+                "image" => $images ? $this->getDefaultImages($images) : null,
+                "image_size" => null,
+                "current_stock" => $product ? $this->getQuantity($product) : null,
+                "tax_calculator" => [
+                    "taxes" => $product ? $this->getTaxes($product) : null,
+                    "computation_method" => 0
+                ],
+                "product_price_wt" => $item->getPriceInclTax(),
+                "product_price_wt_but_ecotax" => $item->getPriceInclTax(),
+                "total_wt" => $item->getRowTotalInclTax(),
+                "total_price" => $item->getRowTotal(),
+                "customizedDatas" => null,
+                "customizationQuantityTotal" => null,
+                "id_address_delivery" => $order->getShippingAddress() ? $order->getShippingAddress()->getId() : null
+            ];
+        }
+
+        $states_history = [];
+        foreach ($order->getStatusHistory() ?: [] as $history) {
+            $states_history[] = [
+                "id_order_state" => $history->getStatus(),
+                "invoice" => null,
+                "send_email" => $history->getIsCustomerNotified(),
+                "module_name" => null,
+                "color" => null,
+                "unremovable" => null,
+                "hidden" => null,
+                "logable" => null,
+                "delivery" => null,
+                "shipped" => null,
+                "paid" => null,
+                "pdf_invoice" => null,
+                "pdf_delivery" => null,
+                "deleted" => null,
+                "id_order_history" => $history->getId(),
+                "id_employee" => $history->getIsCustomerNotified() ? "0" : "1",
+                "id_order" => $order->getId(),
+                "date_add" => $history->getCreatedAt(),
+                "employee_firstname" => null,
+                "employee_lastname" => null,
+                "ostate_name" => $order->getStatusLabel()
+            ];
+        }
+
+        $shippingAddress = $order->getShippingAddress();
+        $billingAddress = $order->getBillingAddress();
+        $payment = $order->getPayment();
+
+        $shop_order = [
+            'id_order' => $order->getId(),
+            'id_address_delivery' => $shippingAddress ? $shippingAddress->getId() : null,
+            'id_address_invoice' => $billingAddress ? $billingAddress->getId() : null,
+            'id_cart' => $order->getQuoteId(),
+            'id_currency' => $order->getOrderCurrency()->getId(),
+            'id_shop_group' => $order->getStore()->getGroup()->getId(),
+            'id_shop' => $order->getStoreId(),
+            'id_lang' => $this->storeManager->getStore()->getId(),
+            'id_customer' => $order->getCustomerId(),
+            'id_carrier' => $order->getShippingMethod(),
+            'current_state' => $order->getStatus(),
+            'payment' => $payment->getMethodInstance()->getTitle(),
+            'module' => $payment->getMethod(),
+            'recyclable' => null,
+            'mobile_theme' => null,
+            'total_discounts' => $order->getDiscountAmount(),
+            'total_discounts_tax_incl' => $order->getDiscountAmount(),
+            'total_discounts_tax_excl' => $order->getDiscountAmount(),
+            'total_paid' => $order->getGrandTotal(),
+            'total_paid_tax_incl' => $order->getGrandTotal(),
+            'total_paid_tax_excl' => $order->getSubtotal(),
+            'total_paid_real' => $order->getTotalPaid(),
+            'total_products' => $order->getSubtotal(),
+            'total_products_wt' => $order->getSubtotalInclTax(),
+            'total_shipping' => $order->getShippingAmount(),
+            'total_shipping_tax_incl' => $order->getShippingInclTax(),
+            'total_shipping_tax_excl' => $order->getShippingAmount(),
+            'carrier_tax_rate' => $order->getShippingAmount() > 0 ? ($order->getShippingTaxAmount() / $order->getShippingAmount()) * 100 : 0,
+            'total_wrapping' => null,
+            'total_wrapping_tax_incl' => null,
+            'total_wrapping_tax_excl' => null,
+            'round_mode' => null,
+            'round_type' => null,
+            'shipping_number' => $order->getShippingDescription(),
+            'conversion_rate' => $order->getBaseToOrderRate(),
+            'invoice_number' => $order->hasInvoices() ? $order->getInvoiceCollection()->getFirstItem()->getIncrementId() : null,
+            'delivery_number' => $order->hasShipments() ? $order->getShipmentsCollection()->getFirstItem()->getIncrementId() : null,
+            'invoice_date' => $order->hasInvoices() ? $order->getInvoiceCollection()->getFirstItem()->getCreatedAt() : null,
+            'delivery_date' => $order->hasShipments() ? $order->getShipmentsCollection()->getFirstItem()->getCreatedAt() : null,
+            'valid' => null,
+            'reference' => $order->getIncrementId(),
+            'date_add' => $order->getCreatedAt(),
+            'date_upd' => $order->getUpdatedAt(),
+            'states_history' => $states_history,
+            'products' => $products,
+            'invoice' => null,
+            'cart' => [
+                'id_cart' => $order->getQuoteId(),
+                'id_shop_group' => $order->getStore()->getGroup()->getId(),
+                'id_shop' => $order->getStoreId(),
+                'id_address_delivery' => $shippingAddress ? $shippingAddress->getId() : null,
+                'id_address_invoice' => $billingAddress ? $billingAddress->getId() : null,
+                'id_carrier' => $order->getShippingMethod(),
+                'id_currency' => $order->getOrderCurrency()->getId(),
+                'id_customer' => $order->getCustomerId(),
+                'id_guest' => $order->getCustomerIsGuest(),
+                'id_lang' => $this->storeManager->getStore()->getId(),
+                'recyclable' => null,
+                'gift' => null,
+                'gift_message' => $order->getGiftMessage(),
+                'mobile_theme' => null,
+                'delivery_option' => null,
+                'secure_key' => $order->getProtectCode(),
+                'allow_seperated_package' => null,
+                'date_add' => $order->getQuote() ? $order->getQuote()->getCreatedAt() : null,
+                'date_upd' => $order->getQuote() ? $order->getQuote()->getUpdatedAt() : null
+            ]
+        ];
+
+        return [
+            "id_origami_order" => null,
+            "id_origami_marketplace" => null,
+            "id_order" => $order->getId(),
+            "reference_origami" => null,
+            "state" => $order->getStatus(),
+            "last_action" => null,
+            "last_error" => null,
+            "date_add" => $order->getCreatedAt(),
+            "date_upd" => $order->getUpdatedAt(),
+            "shop_order" => $shop_order
+        ];
+    }
+
+    public function methodGetOrder($id, $website)
+    {
+        if (!$id) {
+            throw new \Exception("Order ID is required.");
+        }
+
+        try {
+            $order = $this->orderRepository->get($id);
+        } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
+            throw new \Exception("Order not found");
+        }
+
+        if (!in_array($order->getStoreId(), $website->getStoreIds())) {
+            throw new \Exception("Order not found");
+        }
+
+        $orderData = $this->getOrderData($order);
+
+        $this->response->setHeader('Content-Type', 'application/json', true)
+            ->setBody(json_encode($orderData))
+            ->sendResponse();
+    }
+
+    public function methodGetOrders($website)
+    {
+        $pageSize = 10;
+        $curPage = 1;
+
+        $page = $this->request->getParam('page');
+        if (isset($page)) {
+            $pageSize = (int)($page['size'] ?? 10);
+            $curPage = (int)($page['number'] ?? 1);
+        }
+
+        if ($curPage <= 0) {
+            $curPage = 1;
+        }
+        if ($pageSize <= 0) {
+            $pageSize = 10;
+        }
+
+        $orderCollection = $this->orderCollectionFactory->create()
+            ->addAttributeToSelect('*')
+            ->addAttributeToFilter('store_id', ['in' => $website->getStoreIds()])
+            ->setPageSize($pageSize)
+            ->setCurPage($curPage);
+
+        $body = [
+            "orders" => [],
+            "pagination" => [
+                "total_orders" => $orderCollection->getSize(),
+                "total_pages" => ceil($orderCollection->getSize() / $pageSize),
+                "page_number" => $curPage,
+                "page_size" => $pageSize,
+                "offset" => ($curPage - 1) * $pageSize,
+                "limit" => $pageSize
+            ],
+        ];
+
+        foreach ($orderCollection as $order) {
+            $body['orders'][] = $this->getOrderData($order);
+        }
+
+        $this->response->setHeader('Content-Type', 'application/json', true)
+            ->setBody(json_encode($body))
+            ->sendResponse();
+    }
+
+    public function methodOrderStates()
+    {
+        $states = [];
+        $statusCollection = $this->orderStatusCollectionFactory->create();
+        foreach ($statusCollection as $status) {
+            $states[] = [
+                'id' => $status->getStatus(),
+                'name' => $status->getLabel(),
+            ];
+        }
+
+        $this->response->setHeader('Content-Type', 'application/json', true)
+            ->setBody(json_encode($states))
+            ->sendResponse();
     }
 
     public function getTaxes($product)
@@ -153,16 +479,16 @@ class OrigamiApi implements OrigamiApiInterface
                     ->addFilter('source_code', $sellerId)
                     ->create();
 
-                    $items = $this->sourceItemRepository->getList($searchCriteria)->getItems();
+                $items = $this->sourceItemRepository->getList($searchCriteria)->getItems();
 
-                    if (!empty($items)) {
-                        $sourceItem = reset($items);
-                        if ($sourceItem->getQuantity() > 0) {
-                            return $sourceItem->getQuantity();
-                        }
+                if (!empty($items)) {
+                    $sourceItem = reset($items);
+                    if ($sourceItem->getQuantity() > 0) {
+                        return $sourceItem->getQuantity();
                     }
+                }
 
-                    return 0;
+                return 0;
             } catch (\Exception $error) {
                 return 0;
             }
@@ -186,7 +512,10 @@ class OrigamiApi implements OrigamiApiInterface
         return $this->taxCalculation->getRate($rateRequest->setProductClassId($taxClassId));
     }
 
-    public function getDefaultCategory($product) {}
+    public function getDefaultCategory($product)
+    {
+        return null;
+    }
 
     public function getCategories($product)
     {
@@ -204,13 +533,15 @@ class OrigamiApi implements OrigamiApiInterface
 
     public function getDefaultImages($images)
     {
-        if (count($images) === 0)
+        if (count($images) === 0) {
             return null;
+        }
 
         $imageIndex = array_search('cover', $images);
 
-        if ($imageIndex === -1)
+        if ($imageIndex === -1) {
             return null;
+        }
 
         return $images[$imageIndex];
     }
@@ -264,8 +595,9 @@ class OrigamiApi implements OrigamiApiInterface
 
     public function getVariants($product)
     {
-        if ($product->getTypeId() != Configurable::TYPE_CODE)
+        if ($product->getTypeId() != Configurable::TYPE_CODE) {
             return [];
+        }
 
         return [];
     }
@@ -314,8 +646,12 @@ class OrigamiApi implements OrigamiApiInterface
                 $curPage = (int)$page['number'] ?? 1;
             }
 
-            if ($curPage <= 0) $curPage = 1;
-            if ($pageSize <= 0) $pageSize = 10;
+            if ($curPage <= 0) {
+                $curPage = 1;
+            }
+            if ($pageSize <= 0) {
+                $pageSize = 10;
+            }
 
             $allProducts = $this->productCollection->create()
                 ->addAttributeToSelect('*')
@@ -508,13 +844,13 @@ class OrigamiApi implements OrigamiApiInterface
                 return [];
 
             case "orderstates":
-                return [];
+                return $this->methodOrderStates();
 
             case "get-order":
-                return null;
+                return $this->methodGetOrder($id, $website);
 
             case "get-orders":
-                return [];
+                return $this->methodGetOrders($website);
 
             case "get-invoice":
                 return null;
