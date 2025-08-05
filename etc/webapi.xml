@@ -8,4 +8,11 @@
         </resources>
     </route>
 
+    <route url="/V1/origami/vendor/api" method="POST">
+        <service class="Origami\Vendor\Api\OrigamiApiInterface" method="index"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+
 </routes>

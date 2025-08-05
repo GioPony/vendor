@@ -34,6 +34,12 @@ use Origami\Vendor\Api\OrigamiApiInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Sales\Model\ResourceModel\Order\Status\CollectionFactory as OrderStatusCollectionFactory;
+use Magento\Quote\Model\QuoteFactory;
+use Magento\Quote\Model\QuoteManagement;
+use Magento\Customer\Model\CustomerFactory;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Sales\Model\Service\OrderService;
+use Origami\Vendor\Model\OrigamiOrderMappingFactory;
 
 class OrigamiApi implements OrigamiApiInterface
 {
@@ -69,6 +75,12 @@ class OrigamiApi implements OrigamiApiInterface
     public OrderStatusCollectionFactory $orderStatusCollectionFactory;
     public OrderCollectionFactory $orderCollectionFactory;
     public OrderRepositoryInterface $orderRepository;
+    public QuoteFactory $quoteFactory;
+    public QuoteManagement $quoteManagement;
+    public CustomerFactory $customerFactory;
+    public CustomerRepositoryInterface $customerRepository;
+    public OrderService $orderService;
+    public OrigamiOrderMappingFactory $origamiOrderMappingFactory;
 
     public function __construct(
         Response $response,
@@ -98,7 +110,13 @@ class OrigamiApi implements OrigamiApiInterface
         ScopeConfigInterface $scopeConfig,
         OrderStatusCollectionFactory $orderStatusCollectionFactory,
         OrderCollectionFactory $orderCollectionFactory,
-        OrderRepositoryInterface $orderRepository
+        OrderRepositoryInterface $orderRepository,
+        QuoteFactory $quoteFactory,
+        QuoteManagement $quoteManagement,
+        CustomerFactory $customerFactory,
+        CustomerRepositoryInterface $customerRepository,
+        OrderService $orderService,
+        OrigamiOrderMappingFactory $origamiOrderMappingFactory
     ) {
         $this->response = $response;
         $this->request = $request;
@@ -132,6 +150,12 @@ class OrigamiApi implements OrigamiApiInterface
         $this->orderStatusCollectionFactory = $orderStatusCollectionFactory;
         $this->orderCollectionFactory = $orderCollectionFactory;
         $this->orderRepository = $orderRepository;
+        $this->quoteFactory = $quoteFactory;
+        $this->quoteManagement = $quoteManagement;
+        $this->customerFactory = $customerFactory;
+        $this->customerRepository = $customerRepository;
+        $this->orderService = $orderService;
+        $this->origamiOrderMappingFactory = $origamiOrderMappingFactory;
     }
 
     public function getOrderData($order)
@@ -377,7 +401,15 @@ class OrigamiApi implements OrigamiApiInterface
         }
 
         try {
-            $order = $this->orderRepository->get($id);
+            $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
+                ->addFieldToFilter('origami_order_id', $id)
+                ->getFirstItem();
+
+            if(null === $mapping) {
+                throw new \Exception("Order not found");
+            }
+
+            $order = $this->orderRepository->get($mapping->getMagentoOrderId());
         } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
             throw new \Exception("Order not found");
         }
@@ -411,11 +443,15 @@ class OrigamiApi implements OrigamiApiInterface
             $pageSize = 10;
         }
 
-        $orderCollection = $this->orderCollectionFactory->create()
-            ->addAttributeToSelect('*')
-            ->addAttributeToFilter('store_id', ['in' => $website->getStoreIds()])
+        $mappingCollection = $this->origamiOrderMappingFactory->create()->getCollection()
             ->setPageSize($pageSize)
             ->setCurPage($curPage);
+        
+        $orderIds = $mappingCollection->getColumnValues('order_id');
+
+        $orderCollection = $this->orderCollectionFactory->create()
+            ->addFieldToFilter('entity_id', ['in' => $orderIds])
+            ->addAttributeToSelect('*');
 
         $body = [
             "orders" => [],
@@ -629,7 +665,7 @@ class OrigamiApi implements OrigamiApiInterface
         if ($id) {
             $product = $this->productRepository->getById($id);
 
-            if(null === $product){
+            if (null === $product) {
                 throw new \Magento\Framework\Exception\NoSuchEntityException(__("Product not found"));
             }
 
@@ -856,6 +892,12 @@ class OrigamiApi implements OrigamiApiInterface
             case "get-orders":
                 return $this->methodGetOrders($website);
 
+            case "create-order":
+                return $this->methodCreateOrder($website);
+
+            case "update-order":
+                return $this->methodUpdateOrder($website);
+
             case "get-invoice":
                 return null;
 
@@ -867,5 +909,134 @@ class OrigamiApi implements OrigamiApiInterface
         }
 
         throw new \Exception("Undefined method name.");
+    }
+
+    public function methodCreateOrder($website)
+    {
+        $body = json_decode($this->request->getContent(), true);
+
+        try {
+            throw new \Exception("Method not implemented");
+
+            $websiteId = $website->getId();
+
+            // Create a new quote
+            $quote = $this->quoteFactory->create();
+            $quote->setStore($store);
+
+            // Get or create the customer
+            $customer = $this->customerFactory->create();
+            $customer->setWebsiteId($websiteId);
+            $customer->loadByEmail($body['customer']['email']);
+
+            if (!$customer->getEntityId()) {
+                throw new \NoSuchEntityException("Customer not found");
+
+                // // New customer
+                // $customer->setWebsiteId($websiteId)
+                //     ->setStore($store)
+                //     ->setFirstname($body['customer']['firstname'])
+                //     ->setLastname($body['customer']['lastname'])
+                //     ->setEmail($body['customer']['email']);
+                // $customer->save();
+            }
+
+            $quote->assignCustomer($customer);
+
+            // Add products to the quote
+            foreach ($body['products'] as $productData) {
+                $product = $this->productRepository->get($productData['seller_product_id']);
+                $quote->addProduct($product, intval($productData['quantity']));
+            }
+
+            // Set addresses
+            $billingAddress = $quote->getBillingAddress()->addData($body['address_invoice']);
+            $shippingAddress = $quote->getShippingAddress()->addData($body['address_delivery']);
+
+            // Set shipping method
+            $shippingAddress->setCollectShippingRates(true)
+                ->collectShippingRates()
+                ->setShippingMethod('flatrate_flatrate');
+
+            // Set payment method
+            $quote->setPaymentMethod('checkmo');
+            $quote->getPayment()->importData(['method' => 'checkmo']);
+
+            // Collect totals and save the quote
+            $quote->collectTotals()->save();
+
+            // Create the order
+            $order = $this->quoteManagement->submit($quote);
+
+            // Save the mapping
+            $mapping = $this->origamiOrderMappingFactory->create();
+            $mapping->setData([
+                'origami_order_id' => $body['id'],
+                'magento_order_id' => $order->getId()
+            ]);
+            $mapping->save();
+
+            $response = [
+                'actions' => ['create' => true],
+                'order' => [
+                    'id_order' => $order->getId()
+                ]
+            ];
+
+            $this->response->setHeader('Content-Type', 'application/json', true)
+                ->setBody(json_encode($response))
+                ->sendResponse();
+
+        } catch (\Exception $e) {
+            throw new \Exception("Error while creating order: " . $e->getMessage());
+        }
+    }
+
+    public function methodUpdateOrder($website)
+    {
+        $body = json_decode($this->request->getContent(), true);
+
+        if (!isset($body['id']) || !isset($body['seller_order_state'])) {
+            throw new \Exception("Missing parameters id or seller_order_state");
+        }
+
+        try {
+            throw new \Exception("Method not implemented");
+
+            $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
+                ->addFieldToFilter('origami_order_id', $body['id'])
+                ->getFirstItem();
+
+            if (!$mapping->getId()) {
+                throw new \Exception("Order mapping not found");
+            }
+
+            $order = $this->orderRepository->get($mapping->getMagentoOrderId());
+
+            if (!in_array($order->getStoreId(), $website->getStoreIds())) {
+                throw new \Exception("Order not found");
+            }
+
+            $order->setStatus($body['seller_order_state']);
+            $this->orderRepository->save($order);
+
+            $response = [
+                'actions' => ['order-state' => true],
+                'order' => [
+                    'id_origami_order' => $body['id'],
+                    'id_order' => $order->getId(),
+                    'reference_origami' => $order->getIncrementId()
+                ]
+            ];
+
+            $this->response->setHeader('Content-Type', 'application/json', true)
+                ->setBody(json_encode($response))
+                ->sendResponse();
+
+        } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
+            throw new \Exception("Order not found");
+        } catch (\Exception $e) {
+            throw new \Exception("Error while updating order: " . $e->getMessage());
+        }
     }
 }

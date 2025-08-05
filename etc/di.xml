@@ -15,4 +15,11 @@
     <preference for="Origami\Vendor\Api\Data\OrigamiCatagoriesApiInterface" type="Origami\Vendor\Model\Data\OrigamiCatagoriesApi"/>
 
     <preference for="Origami\Vendor\Api\Data\OrigamiCategoryInterface" type="Origami\Vendor\Model\Data\OrigamiCategory"/>
+
+    <virtualType name="Origami\Vendor\Model\ResourceModel\OrigamiOrderMapping\Grid\Collection" type="Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">origami_order_mapping</argument>
+            <argument name="resourceModel" xsi:type="string">Origami\Vendor\Model\ResourceModel\OrigamiOrderMapping</argument>
+        </arguments>
+    </virtualType>
 </config>
