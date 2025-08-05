@@ -444,7 +444,7 @@ class OrigamiApi implements OrigamiApiInterface
         $statusCollection = $this->orderStatusCollectionFactory->create();
         foreach ($statusCollection as $status) {
             $states[] = [
-                'id' => $status->getStatus(),
+                'id_order_state' => $status->getStatus(),
                 'name' => $status->getLabel(),
             ];
         }
