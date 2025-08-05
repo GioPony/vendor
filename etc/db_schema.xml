@@ -1,15 +1,20 @@
 <?xml version="1.0"?>
-<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
     <table name="origami_order_mapping" resource="default" engine="innodb" comment="Origami Order Mapping">
         <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
         <column xsi:type="int" name="origami_order_id" padding="10" unsigned="true" nullable="false" comment="Origami Order ID"/>
         <column xsi:type="int" name="magento_order_id" padding="10" unsigned="true" nullable="false" comment="Magento Order ID"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" default="0" comment="Website ID"/>
+
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="entity_id"/>
         </constraint>
+
         <constraint xsi:type="unique" referenceId="ORIGAMI_ORDER_MAPPING_ORIGAMI_ORDER_ID_UNIQUE">
             <column name="origami_order_id"/>
         </constraint>
+
         <index referenceId="ORIGAMI_ORDER_MAPPING_MAGENTO_ORDER_ID" indexType="btree">
             <column name="magento_order_id"/>
         </index>

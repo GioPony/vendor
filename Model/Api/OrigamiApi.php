@@ -403,6 +403,7 @@ class OrigamiApi implements OrigamiApiInterface
         try {
             $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
                 ->addFieldToFilter('origami_order_id', $id)
+                ->addFieldToFilter('website_id', $website->getId())
                 ->getFirstItem();
 
             if(null === $mapping) {
@@ -444,6 +445,7 @@ class OrigamiApi implements OrigamiApiInterface
         }
 
         $mappingCollection = $this->origamiOrderMappingFactory->create()->getCollection()
+            ->addFieldToFilter('website_id', $website->getId())
             ->setPageSize($pageSize)
             ->setCurPage($curPage);
         
@@ -972,7 +974,8 @@ class OrigamiApi implements OrigamiApiInterface
             $mapping = $this->origamiOrderMappingFactory->create();
             $mapping->setData([
                 'origami_order_id' => $body['id'],
-                'magento_order_id' => $order->getId()
+                'magento_order_id' => $order->getId(),
+                'website_id' => $websiteId
             ]);
             $mapping->save();
 
@@ -1005,6 +1008,7 @@ class OrigamiApi implements OrigamiApiInterface
 
             $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
                 ->addFieldToFilter('origami_order_id', $body['id'])
+                ->addFieldToFilter('website_id', $website->getId())
                 ->getFirstItem();
 
             if (!$mapping->getId()) {
