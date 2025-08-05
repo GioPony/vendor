@@ -406,7 +406,7 @@ class OrigamiApi implements OrigamiApiInterface
                 ->addFieldToFilter('website_id', $website->getId())
                 ->getFirstItem();
 
-            if(null === $mapping) {
+            if(!$mapping->getId()) {
                 throw new \Exception("Order not found");
             }
 
@@ -1004,8 +1004,6 @@ class OrigamiApi implements OrigamiApiInterface
         }
 
         try {
-            throw new \Exception("Method not implemented");
-
             $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
                 ->addFieldToFilter('origami_order_id', $body['id'])
                 ->addFieldToFilter('website_id', $website->getId())
