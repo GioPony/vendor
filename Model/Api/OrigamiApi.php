@@ -629,6 +629,10 @@ class OrigamiApi implements OrigamiApiInterface
         if ($id) {
             $product = $this->productRepository->getById($id);
 
+            if(null === $product){
+                throw new \Magento\Framework\Exception\NoSuchEntityException(__("Product not found"));
+            }
+
             if (count($categoryIds)) {
                 if (array_intersect($categoryIds, $product->getCategoryIds())) {
                     $allProducts[] = $product;
