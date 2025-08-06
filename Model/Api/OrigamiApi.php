@@ -981,7 +981,8 @@ class OrigamiApi implements OrigamiApiInterface
             $mapping->setData([
                 'origami_order_id' => $body['id'],
                 'magento_order_id' => 1,
-                'website_id' => $websiteId
+                'website_id' => $websiteId,
+                'origami_reference' => $body['reference']
             ]);
             $mapping->save();
 
