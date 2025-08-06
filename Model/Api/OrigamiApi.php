@@ -158,7 +158,7 @@ class OrigamiApi implements OrigamiApiInterface
         $this->origamiOrderMappingFactory = $origamiOrderMappingFactory;
     }
 
-    public function getOrderData($order)
+    public function getOrderData($order, $mapping)
     {
         $products = [];
         foreach ($order->getAllVisibleItems() as $item) {
@@ -381,10 +381,10 @@ class OrigamiApi implements OrigamiApiInterface
         ];
 
         return [
-            "id_origami_order" => null,
+            "id_origami_order" => isset($mapping) ? $mapping->getOrigamiOrderId() : null,
             "id_origami_marketplace" => null,
             "id_order" => $order->getId(),
-            "reference_origami" => null,
+            "reference_origami" => isset($mapping) ? $mapping->getOrigamiReference() : null,
             "state" => $order->getStatus(),
             "last_action" => null,
             "last_error" => null,
@@ -400,6 +400,7 @@ class OrigamiApi implements OrigamiApiInterface
             throw new \Exception("Order ID is required.");
         }
 
+        $mapping = null;
         try {
             $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
                 ->addFieldToFilter('origami_order_id', $id)
@@ -419,7 +420,7 @@ class OrigamiApi implements OrigamiApiInterface
             throw new \Exception("Order not found");
         }
 
-        $orderData = $this->getOrderData($order);
+        $orderData = $this->getOrderData($order, $mapping);
 
         $this->response->setHeader('Content-Type', 'application/json', true)
             ->setBody(json_encode($orderData))
@@ -449,7 +450,12 @@ class OrigamiApi implements OrigamiApiInterface
             ->setPageSize($pageSize)
             ->setCurPage($curPage);
         
-        $orderIds = $mappingCollection->getColumnValues('order_id');
+        $orderIds = $mappingCollection->getColumnValues('magento_order_id');
+
+        $indexedMappings = [];
+        foreach ($mappingCollection as $mapping) {
+            $indexedMappings[$mapping->getData('magento_order_id')] = $mapping;
+        }
 
         $orderCollection = $this->orderCollectionFactory->create()
             ->addFieldToFilter('entity_id', ['in' => $orderIds])
@@ -468,7 +474,7 @@ class OrigamiApi implements OrigamiApiInterface
         ];
 
         foreach ($orderCollection as $order) {
-            $body['orders'][] = $this->getOrderData($order);
+            $body['orders'][] = $this->getOrderData($order, $indexedMappings[$order->getId()]);
         }
 
         $this->response->setHeader('Content-Type', 'application/json', true)
@@ -918,21 +924,21 @@ class OrigamiApi implements OrigamiApiInterface
         $body = json_decode($this->request->getContent(), true);
 
         try {
-            throw new \Exception("Method not implemented");
+            // throw new \Exception("Method not implemented");
 
             $websiteId = $website->getId();
 
             // Create a new quote
-            $quote = $this->quoteFactory->create();
-            $quote->setStore($store);
+            // $quote = $this->quoteFactory->create();
+            // $quote->setStore($store);
 
-            // Get or create the customer
-            $customer = $this->customerFactory->create();
-            $customer->setWebsiteId($websiteId);
-            $customer->loadByEmail($body['customer']['email']);
+            // // Get or create the customer
+            // $customer = $this->customerFactory->create();
+            // $customer->setWebsiteId($websiteId);
+            // $customer->loadByEmail($body['customer']['email']);
 
-            if (!$customer->getEntityId()) {
-                throw new \NoSuchEntityException("Customer not found");
+            // if (!$customer->getEntityId()) {
+                // throw new \NoSuchEntityException("Customer not found");
 
                 // // New customer
                 // $customer->setWebsiteId($websiteId)
@@ -941,40 +947,40 @@ class OrigamiApi implements OrigamiApiInterface
                 //     ->setLastname($body['customer']['lastname'])
                 //     ->setEmail($body['customer']['email']);
                 // $customer->save();
-            }
+            // }
 
-            $quote->assignCustomer($customer);
+            // $quote->assignCustomer($customer);
 
             // Add products to the quote
-            foreach ($body['products'] as $productData) {
-                $product = $this->productRepository->get($productData['seller_product_id']);
-                $quote->addProduct($product, intval($productData['quantity']));
-            }
+            // foreach ($body['products'] as $productData) {
+            //     $product = $this->productRepository->get($productData['seller_product_id']);
+            //     $quote->addProduct($product, intval($productData['quantity']));
+            // }
 
-            // Set addresses
-            $billingAddress = $quote->getBillingAddress()->addData($body['address_invoice']);
-            $shippingAddress = $quote->getShippingAddress()->addData($body['address_delivery']);
+            // // Set addresses
+            // $billingAddress = $quote->getBillingAddress()->addData($body['address_invoice']);
+            // $shippingAddress = $quote->getShippingAddress()->addData($body['address_delivery']);
 
-            // Set shipping method
-            $shippingAddress->setCollectShippingRates(true)
-                ->collectShippingRates()
-                ->setShippingMethod('flatrate_flatrate');
+            // // Set shipping method
+            // $shippingAddress->setCollectShippingRates(true)
+            //     ->collectShippingRates()
+            //     ->setShippingMethod('flatrate_flatrate');
 
-            // Set payment method
-            $quote->setPaymentMethod('checkmo');
-            $quote->getPayment()->importData(['method' => 'checkmo']);
+            // // Set payment method
+            // $quote->setPaymentMethod('checkmo');
+            // $quote->getPayment()->importData(['method' => 'checkmo']);
 
-            // Collect totals and save the quote
-            $quote->collectTotals()->save();
+            // // Collect totals and save the quote
+            // $quote->collectTotals()->save();
 
-            // Create the order
-            $order = $this->quoteManagement->submit($quote);
+            // // Create the order
+            // $order = $this->quoteManagement->submit($quote);
 
             // Save the mapping
             $mapping = $this->origamiOrderMappingFactory->create();
             $mapping->setData([
                 'origami_order_id' => $body['id'],
-                'magento_order_id' => $order->getId(),
+                'magento_order_id' => 1,
                 'website_id' => $websiteId
             ]);
             $mapping->save();
@@ -982,7 +988,7 @@ class OrigamiApi implements OrigamiApiInterface
             $response = [
                 'actions' => ['create' => true],
                 'order' => [
-                    'id_order' => $order->getId()
+                    'id_order' => 1
                 ]
             ];
 

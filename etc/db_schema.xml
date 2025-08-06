@@ -6,6 +6,7 @@
         <column xsi:type="int" name="origami_order_id" padding="10" unsigned="true" nullable="false" comment="Origami Order ID"/>
         <column xsi:type="int" name="magento_order_id" padding="10" unsigned="true" nullable="false" comment="Magento Order ID"/>
         <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" default="0" comment="Website ID"/>
+        <column xsi:type="text" name="origami_reference" nullable="true" comment="Origami Reference"/>
 
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="entity_id"/>
