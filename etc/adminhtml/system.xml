@@ -37,6 +37,11 @@
                     <comment>Keep empty to generate</comment>
                     <backend_model>Origami\Vendor\Model\Config\Backend\MagentoApiToken</backend_model>
                 </field>
+                <field id="disable_order_sync" translate="label" type="select" sortOrder="20" showInDefault="0" showInWebsite="1" showInStore="0">
+                    <label>Disable Order Synchronization</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>If set to Yes, order synchronization will be disabled.</comment>
+                </field>
             </group>
         </section>
     </system>

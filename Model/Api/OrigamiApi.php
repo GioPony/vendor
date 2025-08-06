@@ -396,6 +396,8 @@ class OrigamiApi implements OrigamiApiInterface
 
     public function methodGetOrder($id, $website)
     {
+        $this->checkOrderDisabled($website);
+
         if (!$id) {
             throw new \Exception("Order ID is required.");
         }
@@ -429,6 +431,8 @@ class OrigamiApi implements OrigamiApiInterface
 
     public function methodGetOrders($website)
     {
+        $this->checkOrderDisabled($website);
+
         $pageSize = 10;
         $curPage = 1;
 
@@ -482,8 +486,10 @@ class OrigamiApi implements OrigamiApiInterface
             ->sendResponse();
     }
 
-    public function methodOrderStates()
+    public function methodOrderStates($website)
     {
+        $this->checkOrderDisabled($website);
+
         $states = [];
         $statusCollection = $this->orderStatusCollectionFactory->create();
         foreach ($statusCollection as $status) {
@@ -892,7 +898,7 @@ class OrigamiApi implements OrigamiApiInterface
                 return [];
 
             case "orderstates":
-                return $this->methodOrderStates();
+                return $this->methodOrderStates($website);
 
             case "get-order":
                 return $this->methodGetOrder($id, $website);
@@ -919,37 +925,57 @@ class OrigamiApi implements OrigamiApiInterface
         throw new \Exception("Undefined method name.");
     }
 
+    public function checkOrderDisabled($website){
+        $disableOrderSync = $this->scopeConfig->getValue(
+            'origami_vendor/config/disable_order_sync',
+            ScopeInterface::SCOPE_WEBSITES,
+            $website->getId()
+        );
+
+        if($disableOrderSync){
+            throw new \Exception("Order sync is disabled.");
+        }
+    }
+
     public function methodCreateOrder($website)
     {
+        $this->checkOrderDisabled($website);
+
         $body = json_decode($this->request->getContent(), true);
 
         try {
-            // throw new \Exception("Method not implemented");
-
             $websiteId = $website->getId();
 
+            $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
+                ->addFieldToFilter('origami_order_id', $body['id'])
+                ->addFieldToFilter('website_id', $website->getId())
+                ->getFirstItem();
+
+            if ($mapping->getId()) {
+                throw new \Exception("Order mapping already exists!");
+            }
+
+            $store = $website->getDefaultStore();
+
             // Create a new quote
-            // $quote = $this->quoteFactory->create();
-            // $quote->setStore($store);
+            $quote = $this->quoteFactory->create();
+            $quote->setStore($store);
 
-            // // Get or create the customer
-            // $customer = $this->customerFactory->create();
-            // $customer->setWebsiteId($websiteId);
-            // $customer->loadByEmail($body['customer']['email']);
+            // Get or create the customer
+            $customer = $this->customerFactory->create();
+            $customer->setWebsiteId($websiteId);
+            $customer->loadByEmail($body['customer']['email']);
 
-            // if (!$customer->getEntityId()) {
-                // throw new \NoSuchEntityException("Customer not found");
+            if (!$customer->getEntityId()) {
+                $customer->setWebsiteId($websiteId)
+                    ->setStore($store)
+                    ->setFirstname($body['customer']['firstname'])
+                    ->setLastname($body['customer']['lastname'])
+                    ->setEmail($body['customer']['email']);
+                $customer->save();
+            }
 
-                // // New customer
-                // $customer->setWebsiteId($websiteId)
-                //     ->setStore($store)
-                //     ->setFirstname($body['customer']['firstname'])
-                //     ->setLastname($body['customer']['lastname'])
-                //     ->setEmail($body['customer']['email']);
-                // $customer->save();
-            // }
-
-            // $quote->assignCustomer($customer);
+            $quote->assignCustomer($customer);
 
             // Add products to the quote
             // foreach ($body['products'] as $productData) {
@@ -957,30 +983,30 @@ class OrigamiApi implements OrigamiApiInterface
             //     $quote->addProduct($product, intval($productData['quantity']));
             // }
 
-            // // Set addresses
-            // $billingAddress = $quote->getBillingAddress()->addData($body['address_invoice']);
-            // $shippingAddress = $quote->getShippingAddress()->addData($body['address_delivery']);
+            // Set addresses
+            $billingAddress = $quote->getBillingAddress()->addData($body['address_invoice']);
+            $shippingAddress = $quote->getShippingAddress()->addData($body['address_delivery']);
 
-            // // Set shipping method
-            // $shippingAddress->setCollectShippingRates(true)
-            //     ->collectShippingRates()
-            //     ->setShippingMethod('flatrate_flatrate');
+            // Set shipping method
+            $shippingAddress->setCollectShippingRates(true)
+                ->collectShippingRates()
+                ->setShippingMethod('flatrate_flatrate');
 
             // // Set payment method
             // $quote->setPaymentMethod('checkmo');
             // $quote->getPayment()->importData(['method' => 'checkmo']);
 
-            // // Collect totals and save the quote
-            // $quote->collectTotals()->save();
+            // Collect totals and save the quote
+            $quote->collectTotals()->save();
 
-            // // Create the order
-            // $order = $this->quoteManagement->submit($quote);
+            // Create the order
+            $order = $this->quoteManagement->submit($quote);
 
             // Save the mapping
             $mapping = $this->origamiOrderMappingFactory->create();
             $mapping->setData([
                 'origami_order_id' => $body['id'],
-                'magento_order_id' => 1,
+                'magento_order_id' => $order->getId(),
                 'website_id' => $websiteId,
                 'origami_reference' => $body['reference']
             ]);
@@ -989,7 +1015,7 @@ class OrigamiApi implements OrigamiApiInterface
             $response = [
                 'actions' => ['create' => true],
                 'order' => [
-                    'id_order' => 1
+                    'id_order' => $order->getId()
                 ]
             ];
 
@@ -1004,6 +1030,8 @@ class OrigamiApi implements OrigamiApiInterface
 
     public function methodUpdateOrder($website)
     {
+        $this->checkOrderDisabled($website);
+
         $body = json_decode($this->request->getContent(), true);
 
         if (!isset($body['id']) || !isset($body['seller_order_state'])) {
