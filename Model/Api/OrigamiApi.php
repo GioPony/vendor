@@ -409,7 +409,7 @@ class OrigamiApi implements OrigamiApiInterface
                 ->addFieldToFilter('website_id', $website->getId())
                 ->getFirstItem();
 
-            if(!$mapping->getId()) {
+            if (!$mapping->getId()) {
                 throw new \Exception("Order not found");
             }
 
@@ -453,7 +453,7 @@ class OrigamiApi implements OrigamiApiInterface
             ->addFieldToFilter('website_id', $website->getId())
             ->setPageSize($pageSize)
             ->setCurPage($curPage);
-        
+
         $orderIds = $mappingCollection->getColumnValues('magento_order_id');
 
         $indexedMappings = [];
@@ -845,10 +845,85 @@ class OrigamiApi implements OrigamiApiInterface
             ->sendResponse();
     }
 
+    public function methodTaxes()
+    {
+        $taxes = [];
+        $searchCriteria = $this->searchCriteriaBuilder->create();
+        $taxRates = $this->taxRateRepository->getList($searchCriteria)->getItems();
+
+        foreach ($taxRates as $taxRate) {
+            $taxes[] = [
+                'id_tax' => $taxRate->getId(),
+                'name' => $taxRate->getCode(),
+                'rate' => $taxRate->getRate(),
+                'active' => 1,
+                'deleted' => 0,
+            ];
+        }
+
+        $this->response->setHeader('Content-Type', 'application/json', true)
+            ->setBody(json_encode($taxes))
+            ->sendResponse();
+    }
+
+    public function methodCarriers($website)
+    {
+        $carriers = [];
+        $storeId = $website->getDefaultStore()->getId();
+        $activeCarriersConfig = $this->scopeConfig->getValue(
+            'carriers',
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+
+        foreach ($activeCarriersConfig as $carrierCode => $carrierConfig) {
+            if (isset($carrierConfig['active']) && $carrierConfig['active']) {
+                $carriers[] = [
+                    'id_carrier' => $carrierCode,
+                    'name' => $this->scopeConfig->getValue(
+                        'carriers/' . $carrierCode . '/title',
+                        ScopeInterface::SCOPE_STORE,
+                        $storeId
+                    )
+                ];
+            }
+        }
+
+        $this->response->setHeader('Content-Type', 'application/json', true)
+            ->setBody(json_encode($carriers))
+            ->sendResponse();
+    }
+
     public function methodAttributes()
     {
+        $attributesData = [];
+        $searchCriteria = $this->searchCriteriaBuilder->create();
+        $attributeRepository = $this->productAttributeRepository->getList($searchCriteria);
+
+        foreach ($attributeRepository->getItems() as $attribute) {
+            if ($attribute->getIsGlobal() && $attribute->getIsUserDefined() && $attribute->getIsConfigurable()) {
+                $options = [];
+                foreach ($attribute->getOptions() as $option) {
+                    if ($option->getValue() && $option->getLabel()) {
+                        $options[] = [
+                            'id_attribute' => $option->getValue(),
+                            'name' => $option->getLabel()
+                        ];
+                    }
+                }
+
+                if (count($options) > 0) {
+                    $attributesData[] = [
+                        'name' => $attribute->getDefaultFrontendLabel(),
+                        'id_attribute_group' => (string)$attribute->getAttributeId(),
+                        'values' => $options
+                    ];
+                }
+            }
+        }
+
         $this->response->setHeader('Content-Type', 'application/json', true)
-            ->setBody(json_encode([]))
+            ->setBody(json_encode($attributesData))
             ->sendResponse();
     }
 
@@ -889,13 +964,13 @@ class OrigamiApi implements OrigamiApiInterface
                 return $this->methodFeatures($id);
 
             case "attributes":
-                return [];
+                return $this->methodAttributes();
 
             case "taxes":
-                return [];
+                return $this->methodTaxes();
 
             case "carriers":
-                return [];
+                return $this->methodCarriers($website);
 
             case "orderstates":
                 return $this->methodOrderStates($website);
@@ -925,14 +1000,15 @@ class OrigamiApi implements OrigamiApiInterface
         throw new \Exception("Undefined method name.");
     }
 
-    public function checkOrderDisabled($website){
+    public function checkOrderDisabled($website)
+    {
         $disableOrderSync = $this->scopeConfig->getValue(
             'origami_vendor/config/disable_order_sync',
             ScopeInterface::SCOPE_WEBSITES,
             $website->getId()
         );
 
-        if($disableOrderSync){
+        if ($disableOrderSync) {
             throw new \Exception("Order sync is disabled.");
         }
     }
@@ -975,32 +1051,57 @@ class OrigamiApi implements OrigamiApiInterface
                 $customer->save();
             }
 
-            $quote->assignCustomer($customer);
+            $quote->assignCustomer($customer->getDataModel());
 
-            // Add products to the quote
-            // foreach ($body['products'] as $productData) {
-            //     $product = $this->productRepository->get($productData['seller_product_id']);
-            //     $quote->addProduct($product, intval($productData['quantity']));
-            // }
+            foreach ($body['products'] as $productData) {
+                $product = $this->productRepository->get($productData['seller_product_reference']);
+                $quote->addProduct($product, intval($productData['quantity']));
+            }
 
             // Set addresses
-            $billingAddress = $quote->getBillingAddress()->addData($body['address_invoice']);
-            $shippingAddress = $quote->getShippingAddress()->addData($body['address_delivery']);
+            $invoice = $body['address_invoice'];
+            $quote->getBillingAddress()->addData([
+                'firstname'  => $invoice['firstname'],
+                'lastname'   => $invoice['lastname'],
+                'company'    => $invoice['company'],
+                'street'     => [$invoice['address1'], $invoice['address2']],
+                'postcode'   => $invoice['postcode'],
+                'city'       => $invoice['city'],
+                'telephone'  => $invoice['phone_mobile'] ?: $invoice['phone'],
+                'country_id' => $invoice['country_iso'],
+                'vat_id'     => $invoice['vat_number'],
+            ]);
+
+            $delivery = $body['address_delivery'];
+            $shippingAddress = $quote->getShippingAddress()->addData([
+                'firstname'  => $delivery['firstname'],
+                'lastname'   => $delivery['lastname'],
+                'company'    => $delivery['company'],
+                'street'     => [$delivery['address1'], $delivery['address2']],
+                'postcode'   => $delivery['postcode'],
+                'city'       => $delivery['city'],
+                'telephone'  => $delivery['phone_mobile'] ?: $delivery['phone'],
+                'country_id' => $delivery['country_iso'],
+                'vat_id'     => $delivery['vat_number'],
+            ]);
 
             // Set shipping method
-            $shippingAddress->setCollectShippingRates(true)
-                ->collectShippingRates()
-                ->setShippingMethod('flatrate_flatrate');
+            $shippingAddress->setCollectShippingRates(true)->collectShippingRates()->setShippingMethod('flatrate_flatrate');
 
-            // // Set payment method
-            // $quote->setPaymentMethod('checkmo');
-            // $quote->getPayment()->importData(['method' => 'checkmo']);
+            // Set payment method
+            $payment = $quote->getPayment();
+            $payment->setQuote($quote);
+            $payment->setMethod('checkmo');
 
-            // Collect totals and save the quote
+            // Collect totals and save the quote before submitting
             $quote->collectTotals()->save();
 
             // Create the order
             $order = $this->quoteManagement->submit($quote);
+
+            if (null === $order) {
+                throw new \Exception("Order can't be created.");
+            }
 
             // Save the mapping
             $mapping = $this->origamiOrderMappingFactory->create();
