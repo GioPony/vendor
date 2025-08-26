@@ -1021,7 +1021,6 @@ class OrigamiApi implements OrigamiApiInterface
 
         try {
             $websiteId = $website->getId();
-
             $mapping = $this->origamiOrderMappingFactory->create()->getCollection()
                 ->addFieldToFilter('origami_order_id', $body['id'])
                 ->addFieldToFilter('website_id', $website->getId())
@@ -1036,68 +1035,67 @@ class OrigamiApi implements OrigamiApiInterface
             // Create a new quote
             $quote = $this->quoteFactory->create();
             $quote->setStore($store);
+            $quote->setCustomerIsGuest(true);
+            $quote->setCustomerEmail($body['customer']['email']);
+            $quote->setCustomerFirstname($body['customer']['firstname']);
+            $quote->setCustomerLastname($body['customer']['lastname']);
 
-            // Get or create the customer
-            $customer = $this->customerFactory->create();
-            $customer->setWebsiteId($websiteId);
-            $customer->loadByEmail($body['customer']['email']);
-
-            if (!$customer->getEntityId()) {
-                $customer->setWebsiteId($websiteId)
-                    ->setStore($store)
-                    ->setFirstname($body['customer']['firstname'])
-                    ->setLastname($body['customer']['lastname'])
-                    ->setEmail($body['customer']['email']);
-                $customer->save();
-            }
-
-            $quote->assignCustomer($customer->getDataModel());
-
+            // Add products to quote
             foreach ($body['products'] as $productData) {
-                $product = $this->productRepository->get($productData['seller_product_reference']);
+                $product = $this->productRepository->get($productData['seller_product_reference'], false, $store->getId());
                 $quote->addProduct($product, intval($productData['quantity']));
             }
 
             // Set addresses
-            $invoice = $body['address_invoice'];
+            $billingAddressData = $body['address_invoice'];
             $quote->getBillingAddress()->addData([
-                'firstname'  => $invoice['firstname'],
-                'lastname'   => $invoice['lastname'],
-                'company'    => $invoice['company'],
-                'street'     => [$invoice['address1'], $invoice['address2']],
-                'postcode'   => $invoice['postcode'],
-                'city'       => $invoice['city'],
-                'telephone'  => $invoice['phone_mobile'] ?: $invoice['phone'],
-                'country_id' => $invoice['country_iso'],
-                'vat_id'     => $invoice['vat_number'],
+                'firstname'  => $billingAddressData['firstname'],
+                'lastname'   => $billingAddressData['lastname'],
+                'company'    => $billingAddressData['company'],
+                'street'     => [$billingAddressData['address1'], $billingAddressData['address2']],
+                'postcode'   => $billingAddressData['postcode'],
+                'city'       => $billingAddressData['city'],
+                'telephone'  => $billingAddressData['phone'],
+                'country_id' => $billingAddressData['country_iso'],
+                'vat_id'     => $billingAddressData['vat_number'],
             ]);
 
-            $delivery = $body['address_delivery'];
+            $shippingAddressData = $body['address_delivery'];
             $shippingAddress = $quote->getShippingAddress()->addData([
-                'firstname'  => $delivery['firstname'],
-                'lastname'   => $delivery['lastname'],
-                'company'    => $delivery['company'],
-                'street'     => [$delivery['address1'], $delivery['address2']],
-                'postcode'   => $delivery['postcode'],
-                'city'       => $delivery['city'],
-                'telephone'  => $delivery['phone_mobile'] ?: $delivery['phone'],
-                'country_id' => $delivery['country_iso'],
-                'vat_id'     => $delivery['vat_number'],
+                'firstname'  => $shippingAddressData['firstname'],
+                'lastname'   => $shippingAddressData['lastname'],
+                'company'    => $shippingAddressData['company'],
+                'street'     => [$shippingAddressData['address1'], $shippingAddressData['address2']],
+                'postcode'   => $shippingAddressData['postcode'],
+                'city'       => $shippingAddressData['city'],
+                'telephone'  => $shippingAddressData['phone'],
+                'country_id' => $shippingAddressData['country_iso'],
             ]);
 
             // Set shipping method
-            $shippingAddress->setCollectShippingRates(true)->collectShippingRates()->setShippingMethod('flatrate_flatrate');
+            $shippingAddress->setCollectShippingRates(true)->collectShippingRates();
+            $rates = $shippingAddress->getAllShippingRates();
+            if (count($rates) === 0) {
+                throw new \Exception('No shipping rates available for this quote');
+            }
+            $shippingAddress->setShippingMethod($body['shipping']['carrier_id']);
 
             // Set payment method
-            $payment = $quote->getPayment();
-            $payment->setQuote($quote);
-            $payment->setMethod('checkmo');
+            $quote->getPayment()->setMethod('checkmo');
 
-            // Collect totals and save the quote before submitting
+            // Set quote state
+            $quote->setIsActive(true);
+            $quote->setReservedOrderId(null);
+            $quote->setIsSuperMode(true);
+            
+            // Collect totals and save the quote
             $quote->collectTotals()->save();
 
             // Create the order
             $order = $this->quoteManagement->submit($quote);
+
+            $order->setStatus($body['seller_order_state']);
+            $order->save();
 
             if (null === $order) {
                 throw new \Exception("Order can't be created.");
@@ -1123,9 +1121,11 @@ class OrigamiApi implements OrigamiApiInterface
             $this->response->setHeader('Content-Type', 'application/json', true)
                 ->setBody(json_encode($response))
                 ->sendResponse();
-
         } catch (\Exception $e) {
-            throw new \Exception("Error while creating order: " . $e->getMessage());
+            throw new \Exception(
+                "Error while creating order: " . $e->getMessage() .
+                "\nTrace: " . $e->getTraceAsString()
+            );
         }
     }
 
